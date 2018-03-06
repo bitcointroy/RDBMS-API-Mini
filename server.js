@@ -1,109 +1,121 @@
-const express = require('express');
-const bodyParser = require('body-parser');
+const express = require("express");
+const bodyParser = require("body-parser");
 
-const knex = require('./database/db.js');
+const knex = require("./database/db.js");
+const zooRouter = require("./zoos/zooRouter.js");
 
 const server = express();
 
 server.use(bodyParser.json());
 
 // endpoints here
-server.get('/', (req, res) => {
-	res.status(200).json({ api: 'running...' });
+server.get("/", (req, res) => {
+	res.status(200).json({ api: "running..." });
 });
 
-server.get('/zoos/:id', (req, res) => {
-	const { id } = req.params;
-	knex('zoos')
-		.where('id', id)
-		.then(zoos => {
-			if (zoos.length > 0) {
-				res.status(200).json(zoos);
+server.use("/zoos", zooRouter);
+
+server.post("/bears", (req, res) => {
+	const { zoo_id, species, latinName } = req.body;
+	const bear = { zoo_id, species, latinName };
+	knex
+		.insert(req.body)
+		.into("bears")
+		.then(id => {
+			res.status(200).json(id);
+		})
+		.catch(err => {
+			res.status(500).json({ msg: "Could not retrieve any bears." });
+		});
+});
+
+server.get("/bears", (req, res) => {
+	knex("bears")
+		.then(bears => {
+			if (bears.length > 0) {
+				res.status(200).json(bears);
 			} else {
-				res.status(404).json({ msg: `Zoo with id: ${id} does not exist.` });
+				res.status(404).json({ msg: `Bear id: ${id} not found.` });
 			}
 		})
 		.catch(err => {
-			res.status(500).json({ msg: 'Error retrieving the Zoo.' });
+			res.status(500).json({ err: "Error getting bears. Sorry." });
 		});
 });
 
-server.get('/zoos', (req, res) => {
-	knex('zoos')
-		.then(zoos => {
-			res.status(200).json(zoos);
-		})
-		.catch(err => {
-			res.status(500).json({ msg: 'Error retrieving the Zoos.' });
-		});
-});
-
-server.post('/zoos', (req, res) => {
-	const zoo = req.body;
-
-	knex
-		.insert(zoo)
-		.into('zoos')
-		.then(ids => {
-			res.status(201).json(ids);
-		})
-		.catch(err => {
-			res.status(500).json({ msg: 'Zoo not added to zoos Table.' });
-		});
-});
-
-server.put('/zoos/:id', (req, res) => {
+server.get("/bears/:id", (req, res) => {
 	const { id } = req.params;
-	const updatedName = req.body.name;
-
-	knex('zoos')
+	knex("bears")
 		.where({ id })
-		.update({
-			name: updatedName
-		})
-		.then(zoo => {
-			res.status(200).json(zoo);
+		.then(bear => {
+			if (bear.length > 0) {
+				res.status(200).json(bear);
+			} else {
+				res.status(404).json({ msg: `Bear with id: ${id} not found.` });
+			}
 		})
 		.catch(err => {
-			res.status(500).json({ msg: `Could not update zoo id: ${id}.` });
+			res.status(500).json({ err: "Error getting the bear." });
 		});
 });
 
-server.delete('/zoos/:id', (req, res) => {
+server.put("/bears/:id", (req, res) => {
 	const { id } = req.params;
-
-	knex('zoos')
+	const updatedBear = req.body;
+	knex("bears")
 		.where({ id })
-		.then(zoo => {
-			if (zoo.length > 0) {
-				knex('zoos')
+		.then(bear => {
+			if (bear.length > 0) {
+				knex("bears")
+					.where({ id })
+					.update(updatedBear)
+					.then(newBear => {
+						knex("bears")
+							.where({ id })
+							.then(bear => {
+								res.status(200).json(bear);
+							})
+							.catch(err => {
+								res
+									.status(404)
+									.json({ msg: `Error finding updated Bear id: ${id}` });
+							});
+					})
+					.catch(err => {
+						res.status(500).json({ err: "Error updating bear" });
+					});
+			} else {
+				res.status(404).json({ msg: `Bear with id: ${id} not found.` });
+			}
+		})
+		.catch(err => {
+			res.status(500).json({ err: "Error locating bear to be updated." });
+		});
+});
+
+server.delete("/bears/:id", (req, res) => {
+	const { id } = req.params;
+	knex("bears")
+		.where({ id })
+		.then(bear => {
+			if (bear.length > 0) {
+				knex("bears")
 					.where({ id })
 					.del()
 					.then(success => {
-						res.status(200).json({
-							msg: `Zoo with id: ${id} successfully deleted. Say goodbye. :-(`
-						});
+						res.status(200).json({ msg: "bear gone bye bye" });
 					})
 					.catch(err => {
-						res.status(500).json({ msg: `Could not delete zoo id: ${id}.` });
+						res.status(500).json({ msg: "Error deleting the bear." });
 					});
 			} else {
-				res.status(404).json({ msg: `Zoo with id: ${id} does not exist.` });
+				res.status(404).json({ msg: "Error locating bear to delete." });
 			}
-		});
-});
-
-server.post('/bears', (req, res) => {
-	const bear = req.body;
-
-	knex
-		.insert(bear)
-		.into('bears')
-		.then(ids => {
-			res.status(201).json(ids);
 		})
 		.catch(err => {
-			res.status(500).json({ msg: 'Bear not added to Bears Table.' });
+			res
+				.status(500)
+				.json({ err: "Error locating bear at beginning of deletion process." });
 		});
 });
 
